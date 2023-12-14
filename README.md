@@ -1,1 +1,1 @@
-# Aprendizagem_Autom-tica_G9
+# Aprendizagem_Automatica_G9
