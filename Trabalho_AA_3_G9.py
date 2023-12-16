@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import pickle
@@ -48,7 +48,6 @@ MinSamplesLeafs = [1, 3, 5, 10]
 NNeighbors = [1, 3, 5, 7, 9]
 Weight = ["uniform","distance"]
 Metric=['minkowski','euclidean','manhattan']
-NEstimators = [1, 3, 5, 7]
 gammas = [1e-1, 1e-2, 1e-3,1,10]
 Cs = [1, 10, 100, 1e3]
 alphas=[0.0001,0.1,1,10]
@@ -67,11 +66,11 @@ param_gridLassoR = {"alpha": alphas}
 param_gridRidgeR = {"alpha": alphas}
 param_gridKNNR = {"n_neighbors": NNeighbors, "weights": Weight, "metric": Metric}
 param_gridSVMR = {"C": Cs,"epsilon":epsilons,"gamma":gammas}
-param_gridRF = {"n_estimators": NEstimators, "max_depth": MaxDepths, "min_samples_leaf": MinSamplesLeafs}
+param_gridRF = {"max_depth": MaxDepths, "min_samples_leaf": MinSamplesLeafs}
 param_gridMPR = {"alpha": alphas,"activation":activations}
 
 
-# ### Trainig and Evaluation of Regression Models
+# ### Training and Evaluation of Regression Models
 
 # In[ ]:
 
@@ -79,7 +78,7 @@ param_gridMPR = {"alpha": alphas,"activation":activations}
 models = {
     "Linear Regression": (LinearRegression(), param_gridLR),
     "Decision Tree": (DecisionTreeRegressor(), param_gridDT),
-    "Random Forest": (RandomForestRegressor(), param_gridRF),
+    "Random Forest": (RandomForestRegressor(n_estimators=50), param_gridRF),
     "Lasso Regression": (Lasso(max_iter=9999999),param_gridLassoR),
     "Ridge Regression": (Ridge(max_iter=9999999),param_gridRidgeR),
     "KNN Regression": (KNeighborsRegressor(),param_gridKNNR),
@@ -129,4 +128,67 @@ for i, (model_name, (model, params)) in enumerate(models.items()):
 
 plt.tight_layout()
 plt.show()
+
+
+# ### Models for Pre-Defined Parameters
+
+# In[5]:
+
+
+# Load the data using pickle
+X_train, X_ivs, y_train, col_names = pickle.load(open("drd2_data.pickle", "rb"))
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
+
+# Scale the data using PowerTransformer
+scaler = PowerTransformer()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+X_ivs_scaled = scaler.transform(X_ivs)
+       
+# Define the parameter grid for GridSearchCV
+param_gridDT = {}
+param_gridLR = {}
+param_gridLassoR = {}
+param_gridRidgeR = {}
+param_gridKNNR = {}
+param_gridSVMR = {}
+param_gridRF = {}
+param_gridMPR = {}
+# Train and evaluate different regression models with GridSearchCV
+models = {
+    "Linear Regression": (LinearRegression(), param_gridLR),
+    "Decision Tree": (DecisionTreeRegressor(), param_gridDT),
+    "Random Forest": (RandomForestRegressor(), param_gridRF),
+    "Lasso Regression": (Lasso(),param_gridLassoR),
+    "Ridge Regression": (Ridge(),param_gridRidgeR),
+    "KNN Regression": (KNeighborsRegressor(),param_gridKNNR),
+    "SVR Regression": (SVR(),param_gridSVMR),
+    "Multilayer Perceptron Regression": (MLPRegressor(),param_gridMPR),
+}
+
+
+for i, (model_name, (model, params)) in enumerate(models.items()):
+    grid_search = GridSearchCV(model, params, cv=5, scoring='neg_mean_squared_error')
+    grid_search.fit(X_train_scaled, y_train)
+    best_model = grid_search.best_estimator_
+
+    preds = best_model.predict(X_ivs_scaled)
+    preds = preds.clip(0, 1)  # Clip predictions between 0 and 1
+
+    # Evaluate the model
+    rmse = mean_squared_error(y_test, best_model.predict(X_test_scaled))
+    RVE = explained_variance_score(y_test,  best_model.predict(X_test_scaled))
+    print(f"{model_name}: MSE = {rmse},RVE={RVE}")
+
+    # Save the predictions to a text file
+    with open(f"{model_name}_predictions.txt", "w") as file:
+        for pred in preds:
+            file.write(f"{pred}\n")
+        
+     # Print the best hyperparameters
+    best_params = grid_search.best_params_
+    print(f"Best Hyperparameters for {model_name}: {best_params}")
+    
 
